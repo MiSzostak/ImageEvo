@@ -15,9 +15,9 @@ void render(SDL_Renderer* renderer, SDL_Texture* texture, grid& buffer) {
     SDL_RenderClear(renderer);
 
     int pitch = 0;
-    uint8_t* displayPtr;
+    uint32_t* displayPtr;
     SDL_LockTexture(texture, nullptr, (void**)&displayPtr, &pitch);
-    uint32_t* ptr = reinterpret_cast<uint32_t*>(displayPtr);
+    uint32_t* ptr = displayPtr;
     for (size_t i = 0; i < buffer.size(); i++) {
         std::copy(buffer[i].begin(), buffer[i].end(), ptr);
         ptr += buffer[i].size();
@@ -28,17 +28,16 @@ void render(SDL_Renderer* renderer, SDL_Texture* texture, grid& buffer) {
     SDL_RenderPresent(renderer);
 }
 
-void drawEllipse(grid& buffer) {
-    Ellipse test(Vec2i(0, 0), 5, 3, 0);
+void drawEllipse(grid& buffer, Ellipse& e) {
+    uint32_t bb = std::max(e.major, e.minor);
 
-    for (size_t y = 0; y < buffer.size(); y++) {
-        for (size_t x = 0; x < buffer[y].size(); x++) {
-            int xc = x - 650;
-            int yc = y - 375;
-            double a = 1.6;
-            if ((std::pow((xc * std::cos(a) - yc * std::sin(a)), 2) / 2500.f +
-                 std::pow((xc * std::sin(a) + yc * std::cos(a)), 2) / 900.f) <= 1.0) {
-                buffer[y][x] &= 0xFF0000FF;
+    for (size_t y = std::max(0u, e.origin.y - bb); y < std::min((uint32_t)buffer.size(), e.origin.y + bb); y++) {
+        for (size_t x = std::max(0u, e.origin.x - bb); x < std::min((uint32_t)buffer[y].size(), e.origin.x + bb); x++) {
+            int xc = (int)x - (int)e.origin.x;
+            int yc = (int)y - (int)e.origin.y;
+            if ((std::pow((xc * std::cos(e.angle) - yc * std::sin(e.angle)), 2) / std::pow(e.major, 2) +
+                 std::pow((xc * std::sin(e.angle) + yc * std::cos(e.angle)), 2) / std::pow(e.minor, 2)) <= 1.0) {
+                buffer[y][x] = 0xFF000000 | e.color;
             }
         }
     }
@@ -81,7 +80,6 @@ int main(int argc, char** argv) {
         printf("Failed to init renderer\n");
         return 1;
     }
-    SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
 
     // SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
     // if (texture == nullptr) {
@@ -95,7 +93,11 @@ int main(int argc, char** argv) {
     }
 
     grid buffer(h, std::vector<uint32_t>(w, 0xFFFFFFFF));
-    drawEllipse(buffer);
+
+    for (size_t i=0; i<100; i++) {
+        Ellipse test(randomEllipse(w, h));
+        drawEllipse(buffer, test);
+    }
 
     bool done = false;
     while (!done) {
