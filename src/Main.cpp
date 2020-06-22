@@ -8,14 +8,16 @@
 
 #include "Geometry.hpp"
 
+constexpr bool RUN_HEADLESS = false;
+
 using grid = std::vector<std::vector<uint32_t>>;
 
-void render(SDL_Renderer* renderer, SDL_Texture* texture, grid& buffer) {
+void Render(SDL_Renderer* renderer, SDL_Texture* texture, grid& buffer) {
     SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
     SDL_RenderClear(renderer);
 
     int pitch = 0;
-    uint32_t* displayPtr;
+    uint32_t* displayPtr = nullptr;
     SDL_LockTexture(texture, nullptr, (void**)&displayPtr, &pitch);
     uint32_t* ptr = displayPtr;
     for (size_t i = 0; i < buffer.size(); ++i) {
@@ -28,7 +30,7 @@ void render(SDL_Renderer* renderer, SDL_Texture* texture, grid& buffer) {
     SDL_RenderPresent(renderer);
 }
 
-void drawEllipse(grid& buffer, Ellipse& e) {
+void DrawEllipse(grid& buffer, Ellipse& e) {
     uint32_t bb = std::max(e.major, e.minor);
 
     for (size_t y = std::max(0u, e.origin.y - bb); y < std::min((uint32_t)buffer.size(), e.origin.y + bb); ++y) {
@@ -43,14 +45,14 @@ void drawEllipse(grid& buffer, Ellipse& e) {
     }
 }
 
-void next_generation(grid& last_gen, const uint32_t* original) {
+void NextGeneration(grid& last_gen, const uint32_t* original) {
     size_t h = last_gen.size(), w = last_gen[0].size();
     grid new_gen = last_gen;
     int current_mutation = 0;
     double current_score = 0.0, last_score = 0.0;
     bool first_hit = false;
 
-    Ellipse e = randomEllipse(w, h);
+    Ellipse e = RandomEllipse(w, h);
     e.color = original[e.origin.y * w + e.origin.x];
     Ellipse best_fit = e;
 
@@ -59,7 +61,7 @@ void next_generation(grid& last_gen, const uint32_t* original) {
         for (size_t y = std::max(0u, e.origin.y - bb); y < std::min((uint32_t)new_gen.size(), e.origin.y + bb); ++y) {
             for (size_t x = std::max(0u, e.origin.x - bb); x < std::min((uint32_t)new_gen[y].size(), e.origin.x + bb);
                  ++x) {
-                uint32_t new_color;
+                uint32_t new_color = 0;
                 int xc = (int)x - (int)e.origin.x;
                 int yc = (int)y - (int)e.origin.y;
                 if ((std::pow((xc * std::cos(e.angle) - yc * std::sin(e.angle)), 2) / std::pow(e.major, 2) +
@@ -85,7 +87,7 @@ void next_generation(grid& last_gen, const uint32_t* original) {
 
         if (current_score < last_score) {
             for (size_t i = 0; i < h; ++i) std::copy(last_gen[i].begin(), last_gen[i].end(), new_gen[i].begin());
-            drawEllipse(new_gen, e);
+            DrawEllipse(new_gen, e);
             best_fit = e;
             first_hit = true;
         }
@@ -93,11 +95,11 @@ void next_generation(grid& last_gen, const uint32_t* original) {
         last_score = 0;
 
         e = best_fit;
-        e.mutate();
+        e.Mutate();
         if (first_hit)
             current_mutation++;
         else {
-            e = randomEllipse(w, h);
+            e = RandomEllipse(w, h);
             e.color = original[e.origin.y * w + e.origin.x];
             best_fit = e;
         }
@@ -107,12 +109,18 @@ void next_generation(grid& last_gen, const uint32_t* original) {
 }
 
 int main(int argc, char** argv) {
-    if (argc != 2) {
-        printf("Usage: image_evo <image path>\n");
+    if (argc != 2 && argc != 3) {
+        printf("Usage: image_evo <image path> [generation limit]\n");
         return 1;
     }
     std::string file_path(argv[1]);
     std::string window_name = "ImageEvo [" + file_path + "]";
+
+    int gen_limit = argc == 3 ? std::atoi(argv[2]) : 1000;
+    if (gen_limit < 0) {
+        printf("Invalid generation limit %d\n", gen_limit);
+        return 1;
+    }
 
     if (!(IMG_Init(IMG_INIT_PNG) & IMG_INIT_PNG)) {
         printf("Failed to init image loader\n");
@@ -134,12 +142,24 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    const int w = surface->w, h = surface->h;
+    grid buffer(h, std::vector<uint32_t>(w, 0xFFFFFFFF));
+    int gen_ctr = 0;
+
+    if constexpr (RUN_HEADLESS) {
+        while (gen_ctr < gen_limit) {
+            NextGeneration(buffer, reinterpret_cast<uint32_t*>(surface->pixels));
+            printf("Generation #%d\n", gen_ctr);
+            gen_ctr++;
+        }
+        return 0;
+    }
+
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         printf("Error: %s\n", SDL_GetError());
         return 1;
     }
 
-    const int w = surface->w, h = surface->h;
     SDL_Window* window =
         SDL_CreateWindow(window_name.c_str(), SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, w, h, SDL_WINDOW_SHOWN);
     if (window == nullptr) {
@@ -164,10 +184,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    grid buffer(h, std::vector<uint32_t>(w, 0xFFFFFFFF));
-
     bool done = false, stop_evo = false;
-    size_t ctr = 0;
     while (!done) {
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
@@ -178,13 +195,13 @@ int main(int argc, char** argv) {
             if (event.type == SDL_KEYUP && event.key.keysym.scancode == SDL_SCANCODE_Q) stop_evo = true;
         }
 
-        if (!stop_evo && ctr < 1000) {
-            next_generation(buffer, reinterpret_cast<uint32_t*>(surface->pixels));
-            printf("Generation #%lu\n", ctr);
-            ctr++;
+        if (!stop_evo && gen_ctr < gen_limit) {
+            NextGeneration(buffer, reinterpret_cast<uint32_t*>(surface->pixels));
+            printf("Generation #%d\n", gen_ctr);
+            gen_ctr++;
         }
 
-        render(renderer, texture, buffer);
+        Render(renderer, texture, buffer);
     }
 
     SDL_FreeSurface(surface);
