@@ -6,13 +6,11 @@
 #include <string>
 #include <vector>
 
-#include "Geometry.hpp"
+#include "geometry.hpp"
 
-constexpr bool RUN_HEADLESS = false;
+using Grid = std::vector<std::vector<uint32_t>>;
 
-using grid = std::vector<std::vector<uint32_t>>;
-
-void Render(SDL_Renderer* renderer, SDL_Texture* texture, grid& buffer) {
+void Render(SDL_Renderer* renderer, SDL_Texture* texture, Grid& buffer) {
     SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
     SDL_RenderClear(renderer);
 
@@ -30,7 +28,7 @@ void Render(SDL_Renderer* renderer, SDL_Texture* texture, grid& buffer) {
     SDL_RenderPresent(renderer);
 }
 
-void DrawEllipse(grid& buffer, Ellipse& e) {
+void DrawEllipse(Grid& buffer, Ellipse& e) {
     uint32_t bb = std::max(e.major, e.minor);
 
     for (size_t y = std::max(0u, e.origin.y - bb); y < std::min((uint32_t)buffer.size(), e.origin.y + bb); ++y) {
@@ -45,9 +43,9 @@ void DrawEllipse(grid& buffer, Ellipse& e) {
     }
 }
 
-void NextGeneration(grid& last_gen, const uint32_t* original) {
+void NextGeneration(Grid& last_gen, const uint32_t* original) {
     size_t h = last_gen.size(), w = last_gen[0].size();
-    grid new_gen = last_gen;
+    Grid new_gen = last_gen;
     int current_mutation = 0;
     double current_score = 0.0, last_score = 0.0;
     bool first_hit = false;
@@ -96,9 +94,9 @@ void NextGeneration(grid& last_gen, const uint32_t* original) {
 
         e = best_fit;
         e.Mutate();
-        if (first_hit)
+        if (first_hit) {
             current_mutation++;
-        else {
+        } else {
             e = RandomEllipse(w, h);
             e.color = original[e.origin.y * w + e.origin.x];
             best_fit = e;
@@ -143,17 +141,17 @@ int main(int argc, char** argv) {
     }
 
     const int w = surface->w, h = surface->h;
-    grid buffer(h, std::vector<uint32_t>(w, 0xFFFFFFFF));
+    Grid buffer(h, std::vector<uint32_t>(w, ~0u));
     int gen_ctr = 0;
 
-    if constexpr (RUN_HEADLESS) {
+#if 0
         while (gen_ctr < gen_limit) {
             NextGeneration(buffer, reinterpret_cast<uint32_t*>(surface->pixels));
             printf("Generation #%d\n", gen_ctr);
             gen_ctr++;
         }
         return 0;
-    }
+#endif
 
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         printf("Error: %s\n", SDL_GetError());
@@ -184,7 +182,9 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    bool done = false, stop_evo = false;
+    printf("Press H to pause and S to save to file\n");
+
+    bool done = false, pause = false, take_screenshot = false;
     while (!done) {
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
@@ -192,10 +192,20 @@ int main(int argc, char** argv) {
             if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE &&
                 event.window.windowID == SDL_GetWindowID(window))
                 done = true;
-            if (event.type == SDL_KEYUP && event.key.keysym.scancode == SDL_SCANCODE_Q) stop_evo = true;
+            if (event.type == SDL_KEYUP && event.key.keysym.scancode == SDL_SCANCODE_H) pause = !pause;
+            if (event.type == SDL_KEYUP && event.key.keysym.scancode == SDL_SCANCODE_S) take_screenshot = true;
         }
 
-        if (!stop_evo && gen_ctr < gen_limit) {
+        if (take_screenshot) {
+            take_screenshot = false;
+            printf("Taking screenshot after %d generations\n", gen_ctr);
+            SDL_Surface* out_surface = SDL_CreateRGBSurface(0, w, h, 32, 0, 0, 0, 0);
+            SDL_RenderReadPixels(renderer, nullptr, out_surface->format->format, out_surface->pixels, out_surface->pitch);
+            IMG_SavePNG(out_surface, "result.png");
+            SDL_FreeSurface(out_surface);
+        }
+
+        if (!pause && gen_ctr < gen_limit) {
             NextGeneration(buffer, reinterpret_cast<uint32_t*>(surface->pixels));
             printf("Generation #%d\n", gen_ctr);
             gen_ctr++;

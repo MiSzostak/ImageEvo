@@ -1,6 +1,5 @@
 cmake-build-debug
 .idea
 .vscode
-.clang-format
 .ccls-cache
 compile_commands.json
