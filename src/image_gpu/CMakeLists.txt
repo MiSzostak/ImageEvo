@@ -1,8 +1,12 @@
-find_package(glfw3 3.3 REQUIRED)
+include(FindPkgConfig)
 
-add_executable(image_gpu main.cpp)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(SDL2 REQUIRED sdl2)
 
-target_include_directories(image_gpu PUBLIC ../../libs/glad/include)
+add_executable(image_gpu
+        renderer.cpp
+        main.cpp)
 
-target_link_libraries(image_gpu glad glfw)
+target_include_directories(image_gpu PUBLIC ../../libs/gl3w ${SDL2_INCLUDE_DIRS})
+target_link_libraries(image_gpu PRIVATE gl3w ${SDL2_LIBRARIES})
 target_link_options(image_gpu PRIVATE -lGL -ldl)

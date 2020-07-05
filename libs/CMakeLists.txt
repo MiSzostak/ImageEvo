@@ -1,2 +1,2 @@
-add_library(glad glad/src/glad.c)
-target_include_directories(glad PUBLIC glad/include)
+add_library(gl3w gl3w/gl3w.c)
+target_include_directories(gl3w PUBLIC gl3w)
