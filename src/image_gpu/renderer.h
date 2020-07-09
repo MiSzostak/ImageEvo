@@ -22,8 +22,9 @@ public:
     ~Renderer();
     void Init();
 
-    void Draw();
+    void Draw(GLuint fb_handler);
     void PushTriangle(std::array<Position, 3> vertices, std::array<Color, 3> color);
+    void GenRandomTriangle();
 private:
     GLuint GetAttributeIndex(const char* attribute);
 

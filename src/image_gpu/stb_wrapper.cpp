@@ -1,0 +1,7 @@
+#ifndef IMAGEEVO_STB_WRAPPER_CPP
+#define IMAGEEVO_STB_WRAPPER_CPP
+
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
+
+#endif  // IMAGEEVO_STB_WRAPPER_CPP
