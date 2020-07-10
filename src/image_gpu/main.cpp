@@ -1,8 +1,6 @@
 #include <GL/gl3w.h>
 #include <SDL.h>
 
-#include <vector>
-
 #include <stb_image.h>
 
 #include "renderer.h"
@@ -22,13 +20,18 @@ int main(int argc, char** argv) {
         printf("Usage: image_gpu <image path>\n");
         return 1;
     }
-    printf("Loading image %s\n", argv[1]);
+
     int width, height, n;
     u8* image_data = stbi_load(argv[1], &width, &height, &n, 0);
     if (!image_data) {
         printf("Failed to load image data\n");
         return 1;
-    };
+    }
+    printf("Loading image %s with dimensions (%d,%d) and %d components per pixel\n", argv[1], width, height, n);
+    if (n != 3) {
+        printf("%d components per pixel currently not supported\n", n);
+        return 1;
+    }
 
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         printf("SDL_Error: %s\n", SDL_GetError());
@@ -97,23 +100,18 @@ int main(int argc, char** argv) {
         printf("Failed to init off-screen framebuffer\n");
         return 1;
     }
-    glClearColor(1, 0, 0, 1);
+    glClearColor(1, 1, 1, 1);
     glClear(GL_COLOR_BUFFER_BIT);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-    std::vector<u8> tex_data(width * height * 3);
+    //std::vector<u8> tex_data(width * height * 3);
     //glBindTexture(GL_TEXTURE_2D, tex_handle);
     //glGetTexImage(GL_TEXTURE_2D, 0, GL_RGB, GL_UNSIGNED_BYTE, tex_data.data());
     //printf("First pixel: r=%u, g=%u, b=%u\n", tex_data[0], tex_data[1], tex_data[2]);
     //glBindTexture(GL_TEXTURE_2D, 0);
 
     Renderer renderer;
-    renderer.Init();
-
-    //std::array<Position, 3> test_pos = { Position(.5f, -.5f), Position(-.5f, -.5f), Position(.0f, .5f) };
-    //std::array<Color, 3> test_color = { Color(1.f, 0.f, 0.f), Color(0.f, 1.f, 0.f), Color(0.f, 0.f, 1.f) };
-    //renderer.PushTriangle(test_pos, test_color);
-    //renderer.GenRandomTriangle();
+    renderer.Init(width, height, image_data);
 
     bool done = false;
     while (!done) {
@@ -123,10 +121,17 @@ int main(int argc, char** argv) {
             if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE &&
                 event.window.windowID == SDL_GetWindowID(window))
                 done = true;
-            if (event.type == SDL_KEYUP && event.key.keysym.scancode == SDL_SCANCODE_G) {
-                for (u32 i = 0; i < 100; i++) renderer.GenRandomTriangle();
-                renderer.Draw(scratch_buffer);
-            }
+            //if (event.type == SDL_KEYUP && event.key.keysym.scancode == SDL_SCANCODE_G) {
+            //    renderer.GenRandomTriangle(tex_handle);
+            //    renderer.Draw(scratch_buffer);
+            //    renderer.CheckFitness(tex_handle);
+            //}
+        }
+
+        for (u32 i = 0; i < 100; i++) {
+            renderer.GenRandomTriangle(tex_handle);
+            renderer.Draw(scratch_buffer);
+            renderer.CheckFitness(tex_handle);
         }
 
         glClearColor(1, 1, 1, 1);
