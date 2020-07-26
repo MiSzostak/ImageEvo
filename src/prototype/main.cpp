@@ -93,7 +93,7 @@ void NextGeneration(Grid& last_gen, const uint32_t* original) {
         last_score = 0;
 
         e = best_fit;
-        e.Mutate();
+        e.Mutate(w, h);
         if (first_hit) {
             current_mutation++;
         } else {

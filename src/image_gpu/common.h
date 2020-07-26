@@ -28,7 +28,7 @@ using s64 = int64_t;
 
 #define Assert(Expr)                                                                                             \
     if (!(Expr)) {                                                                                               \
-        char buf[128];                                                                                           \
+        char buf[256];                                                                                           \
         std::snprintf(buf, sizeof(buf), "%s in function %s (%s:%u)", "Assert failed: '" #Expr "'", __FUNCTION__, \
                       __FILE__, __LINE__);                                                                       \
         std::fputs(buf, stderr);                                                                                 \

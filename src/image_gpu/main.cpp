@@ -112,6 +112,7 @@ int main(int argc, char** argv) {
 
     Renderer renderer;
     renderer.Init(width, height, image_data);
+    renderer.SetOffscreenFB(scratch_buffer, tex_handle);
 
     bool done = false;
     while (!done) {
@@ -121,18 +122,9 @@ int main(int argc, char** argv) {
             if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE &&
                 event.window.windowID == SDL_GetWindowID(window))
                 done = true;
-            //if (event.type == SDL_KEYUP && event.key.keysym.scancode == SDL_SCANCODE_G) {
-            //    renderer.GenRandomTriangle(tex_handle);
-            //    renderer.Draw(scratch_buffer);
-            //    renderer.CheckFitness(tex_handle);
-            //}
         }
 
-        for (u32 i = 0; i < 100; i++) {
-            renderer.GenRandomTriangle(tex_handle);
-            renderer.Draw(scratch_buffer);
-            renderer.CheckFitness(tex_handle);
-        }
+        renderer.NextGeneration();
 
         glClearColor(1, 1, 1, 1);
         glClear(GL_COLOR_BUFFER_BIT);
