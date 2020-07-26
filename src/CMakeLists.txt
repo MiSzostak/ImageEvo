@@ -1,2 +1,2 @@
-add_subdirectory(prototype)
-add_subdirectory(image_gpu)
+add_subdirectory(ellipses_cpu)
+add_subdirectory(triangles_gpu)
