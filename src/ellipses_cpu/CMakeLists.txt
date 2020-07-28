@@ -6,7 +6,6 @@ pkg_check_modules(SDL2 REQUIRED sdl2)
 find_package(OpenCV REQUIRED)
 
 add_executable(image_evo
-        stb_wrapper.cpp
         main.cpp)
 
 target_compile_options(image_evo PRIVATE -fopenmp)
