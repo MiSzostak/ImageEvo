@@ -11,6 +11,9 @@
 
 #include "geometry.hpp"
 
+#define USE_EDGE_DETECTION false
+#define SCALE_FACTOR 2
+
 void Render(SDL_Renderer* renderer, SDL_Texture* texture, cv::Mat& buffer) {
     SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
     SDL_RenderClear(renderer);
@@ -123,42 +126,63 @@ void NextGeneration(int width, int height, cv::Mat& last_gen, const u8* original
     std::memcpy(last_gen.data, new_gen.data, new_gen.total() * new_gen.elemSize());
 }
 
-int ConvertVideo(std::string& video_path) {
-    cv::VideoCapture capture(video_path, cv::CAP_GSTREAMER);
+int ConvertVideo(std::string& video_path, u32 gen_limit, u32 frame_limit = 30) {
+    cv::VideoCapture capture(video_path);
     if (!capture.isOpened()) {
         printf("Failed to open source video from %s\n", video_path.c_str());
         return 1;
     }
-    // output should have the same properties
-    printf("%f\n", capture.get(cv::CAP_PROP_FPS));
-    cv::VideoWriter writer("video_out.avi",
-                           cv::VideoWriter::fourcc('H', '2', '6', '4'), capture.get(cv::CAP_PROP_FPS),
-                           cv::Size(capture.get(cv::CAP_PROP_FRAME_WIDTH), capture.get(cv::CAP_PROP_FRAME_HEIGHT)));
+
+    u64 start_name = video_path.find_last_of('/');
+    std::string out_file = "_" + video_path.substr(start_name == std::string::npos ? 0 : start_name) + ".bmp";
+
+    double start = omp_get_wtime();
 
     // convert frame-by-frame
     u32 frame_counter = 0;
-    while (1) {
+    while (frame_counter < frame_limit) {
         // get next frame
         cv::Mat frame;
         capture >> frame;
         // no frames left
         if (frame.empty()) break;
 
+        if constexpr (SCALE_FACTOR > 1) {
+            // downsample
+            cv::resize(frame, frame, cv::Size(frame.cols / SCALE_FACTOR, frame.rows / SCALE_FACTOR));
+        }
+
         // convert the frame
-        // TODO
+        cv::Mat out_frame;
+        cv::medianBlur(frame, out_frame, 151);
+        u32 gen_ctr = 0;
+        while (gen_ctr < gen_limit) {
+            NextGeneration(frame.cols, frame.rows, out_frame, frame.data);
+            gen_ctr++;
+        }
+
+        if constexpr (SCALE_FACTOR > 1) {
+            // upscale
+            cv::resize(out_frame, out_frame, cv::Size(out_frame.cols * 4, out_frame.rows * 4));
+        }
 
         // save frame
-        writer << frame;
+        std::string frame_name = "out" + std::to_string(frame_counter) + out_file;
+        cv::imwrite(frame_name, out_frame);
+        printf("Finished frame %u\n", frame_counter);
         frame_counter++;
     }
+
+    double end = omp_get_wtime();
+    printf("Time = %.16g\n", end - start);
 
     printf("Finished converting video with %u frames\n", frame_counter);
     return 0;
 }
 
 int main(int argc, char** argv) {
-    // use all cores
-    omp_set_num_threads(omp_get_max_threads());
+    // use 4 cores
+    omp_set_num_threads(4);
     printf("ImageEvo running on %d thread(s)\n", omp_get_max_threads());
 
     //printf("%s\n", cv::getBuildInformation().c_str());
@@ -189,26 +213,27 @@ int main(int argc, char** argv) {
     }
 
     if (video) {
-        int error = ConvertVideo(file_path);
+        int error = ConvertVideo(file_path, gen_limit);
         if (error) printf("Failed to convert video\n");
         return error;
     }
 
-    cv::Mat buffer;
     cv::Mat image = cv::imread(file_path);
-    //cv::cvtColor(image, image, cv::COLOR_BGR2RGB);
     const int w = image.cols, h = image.rows, components = image.channels();
-
     if (!image.data || components != 3) {
         printf("Failed to load image %s\n", file_path.c_str());
         return 1;
     }
 
+    cv::Mat buffer;
+    //cv::cvtColor(image, image, cv::COLOR_BGR2RGB);
     // create a blurred background as the baseline
     cv::medianBlur(image, buffer, 151);
 
+#if USE_EDGE_DETECTION
+    // edge detection
     // TODO: try black edges with thicker lines
-#if 0
+
     cv::Mat grayscale, edges, result;
     result.create(image.size(), image.type());
     // create grayscale image
