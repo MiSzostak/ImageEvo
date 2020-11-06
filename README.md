@@ -20,7 +20,11 @@ The program generates semi-random shapes and uses a simple fitness function to m
 
 ## Building
 
-TODO
+Install dependencies: ```SDL2, OpenCV```
+
+``` mkdir build && cd build ```
+
+``` cmake .. && cmake --build . ```
 
 ## Experimental
 
